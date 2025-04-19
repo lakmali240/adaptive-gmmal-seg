@@ -32,8 +32,8 @@ PATH_TO_TRAINED_MODEL = ' '
 3) Traning and validation dataset directory
 
 TRAIN_IMG_DIR = "<training image directory>"
-TRAIN_MASK_DIR = "<training mask directory>"
+TRAIN_MASK_DIR = "<training mask directory>" # not used here
 VAL_IMG_DIR = "<validation image directory>"
-VAL_MASK_DIR = "<validation mask directory>"
+VAL_MASK_DIR = "<validation mask directory>" # not used here
 
 
