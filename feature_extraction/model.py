@@ -81,7 +81,5 @@ def test():
     print("Shape of predictions: \n", preds.shape)
     print("Shape of feature_channels (the bottleneck layer output): \n", feature_channels.shape)
 
-
-
 if __name__ == "__main__":
     test()
