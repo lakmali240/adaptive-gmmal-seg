@@ -1,6 +1,7 @@
 This is for self-supervised learning
 ------------------------------------
 
+
 1) Change the following parameters to match with your self-supervised training in self_supervised_learning.py
 
 """ Training Hyperparameters """
