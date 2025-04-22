@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
 # Load the bottleneck features
-features_space = torch.load("results/ssl_features_space/2025-04-22_00-03-17/features_space.pt", weights_only=True)
+features_space = torch.load("results/ssl_features_space/2025-04-19_17-25-19/features_space.pt", weights_only=True)
 
 # Load the file names
-with open("results/ssl_features_space/2025-04-22_00-03-17/file_names.txt", "r") as f:
+with open("results/ssl_features_space/2025-04-19_17-25-19/file_names.txt", "r") as f:
     file_names = [line.strip() for line in f.readlines()]
 
 # Find the index of the specific image
@@ -33,7 +33,7 @@ def plot_individual_channels(feature, num_channels=4):
         axes[i].axis('off')
     plt.colorbar(im, ax=axes[-1])
     plt.tight_layout()
-    plt.savefig('results/ssl_features_space/2025-04-22_00-03-17/individual_channels.png')
+    plt.savefig('results/ssl_features_space/2025-04-19_17-25-19/individual_channels.png')
     plt.close()
 
 # Strategy 2: PCA to reduce dimensionality across channels
@@ -55,7 +55,7 @@ def plot_pca_reduction(feature):
     plt.imshow(pca_img)
     plt.title('PCA Visualization (Top 3 Components)')
     plt.axis('off')
-    plt.savefig('results/ssl_features_space/2025-04-22_00-03-17/pca_visualization.png')
+    plt.savefig('results/ssl_features_space/2025-04-19_17-25-19/pca_visualization.png')
     plt.close()
 
 # Strategy 3: Feature aggregation - statistics across channels
@@ -83,7 +83,7 @@ def plot_feature_statistics(feature):
     plt.colorbar(im3, ax=axes[2])
     
     plt.tight_layout()
-    plt.savefig('results/ssl_features_space/2025-04-22_00-03-17/feature_statistics.png')
+    plt.savefig('results/ssl_features_space/2025-04-19_17-25-19/feature_statistics.png')
     plt.close()
 
 # Run all visualization strategies
