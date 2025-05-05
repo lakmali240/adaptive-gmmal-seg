@@ -21,7 +21,7 @@ from utils.utils import (
     data_loader_for_fully_supervised_learning,
     Config,
     inspect_pixel_value_range,
-    save_predictions_as_imgs,
+    save_ssl_predictions_as_imgs,
     save_fss_predictions_images,
     load_trained_model,
     calculate_dice_score,

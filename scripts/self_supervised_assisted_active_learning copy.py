@@ -5,6 +5,7 @@ from datetime import datetime
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Third-party imports
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -18,11 +19,10 @@ import pytz
 from src.model import UNET
 from utils.utils import (
     get_loaders_with_augmentation,
-    data_loader_for_fully_supervised_learning,
+    data_loader_for_self_supervised_assisted_active_learning,
     Config,
     inspect_pixel_value_range,
-    save_predictions_as_imgs,
-    save_fss_predictions_images,
+    save_ssl_predictions_as_imgs,
     load_trained_model,
     calculate_dice_score,
     print_current_lr,
@@ -35,19 +35,19 @@ LEARNING_RATE = 1e-4
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 16
 START_EPOCH = 1
-NUM_EPOCHS = 50
+NUM_EPOCHS = 100
 NUM_WORKERS = 4
 IMAGE_HEIGHT = 256 
 IMAGE_WIDTH = 256  
 PIN_MEMORY = True
 
 """ Early Stopping Conditions """
-EARLY_STOPPING_EPOCHES = 15
-EXPECTED_BEST_LOSS = 0.1
+EARLY_STOPPING_EPOCHES = 30
+EXPECTED_BEST_LOSS = 0.005
 
-""" Load Pre-trained Model"""
-LOAD_TRAINED_MODEL = False
-PATH_TO_TRAINED_MODEL = None
+""" Load Self-Supervised Trained Model"""
+LOAD_TRAINED_MODEL = True
+PATH_TO_TRAINED_MODEL = 'Results/ssl_trained_model/2025-04-19_01-19-21/self_supervised_learning.pt'
 
 """ Load Dataset"""
 TRAIN_IMG_DIR = "../ISIC_2017_dataset/data/train_images/"
@@ -58,8 +58,8 @@ TEST_IMG_DIR = "../ISIC_2017_dataset/data/test_images/"
 TEST_MASK_DIR = "../ISIC_2017_dataset/data/test_masks/" 
 
 """ Saving Directory"""
-MODEL_DIRECTORY = "results/fully_supervised_trained_model"
-IMAGE_DIRECTORY = "results/fully_supervised_validation_images"
+MODEL_DIRECTORY = "results/ssaal_trained_model"
+IMAGE_DIRECTORY = "results/ssaal_validation_images"
 
 """ Training """
 def train_fn(loader, model, optimizer, loss_fn, device):
@@ -69,16 +69,14 @@ def train_fn(loader, model, optimizer, loss_fn, device):
     bottlenecks = []  # Collect bottlenecks across batches
     loop = tqdm(loader)
     for batch_idx, (data, targets) in enumerate(loop):
-        data = data.to(device) # [-1,1]
-        targets = targets.float().to(device) # {0,1}
+        data = data.to(device)
+        targets = targets.float().to(device)
+        targets = (targets + 1) / 2 # Normalize this from [-1, 1] to [0, 1]
 
         # forward
         predictions, bottleneck = model(data)
-        predictions = torch.sigmoid(predictions)  # Convert logits to probabilities [0,1]        
-        loss = loss_fn(predictions, targets) # [0,1], {0,1}
-
-        # After calculating loss, convert to binary for metrics
-        predictions = (predictions > 0.5).float()  # Convert to binary {0, 1} for metrics/visualization
+        predictions = torch.sigmoid(predictions)  # Convert logits to probabilities [0, 1]           
+        loss = loss_fn(predictions, targets)
 
         # backward - standard approach without scaler
         optimizer.zero_grad()
@@ -88,9 +86,11 @@ def train_fn(loader, model, optimizer, loss_fn, device):
         # Calculate metrics
         total_loss += loss.item()
         preds = predictions.float()
-        total_dice += calculate_dice_score(preds, targets) # {0,1}, {0,1}
+        total_dice += calculate_dice_score(preds, targets)
 
-        
+        # Store bottlenecks (move to CPU)
+        bottlenecks.append(bottleneck.detach().cpu())
+
         # update tqdm loop
         loop.set_postfix(loss=loss.item())        
 
@@ -111,19 +111,15 @@ def validate_fn(loader, model, loss_fn, device):
     with torch.no_grad():
         for idx, (data, targets) in enumerate(loop):
             data = data.to(device)
-            targets = targets.float().to(device)  # {0,1}
+            targets = targets.float().to(device)  
+            targets = (targets + 1) / 2 # Normalize this from [-1, 1] to [0, 1]
             
             predictions, bottleneck = model(data) 
             predictions = torch.sigmoid(predictions)  # Convert logits to probabilities [0, 1] 
-            loss = loss_fn(predictions, targets) # [0,1], {0,1}
-
-            # After calculating loss, convert to binary for metrics
-            predictions = (predictions > 0.5).float()  # Convert to binary {0, 1} for metrics/visualization
-
-            # Calculate metrics
+            loss = loss_fn(predictions, targets)
             total_loss += loss.item()
             preds = predictions.float()
-            total_dice += calculate_dice_score(preds, targets) # {0,1}, {0,1}
+            total_dice += calculate_dice_score(preds, targets)
             
             # Update progress bar
             loop.set_postfix(loss=loss.item())
@@ -147,18 +143,40 @@ def main():
     
     # Model initialization
     model = UNET(in_channels=3, out_channels=1).to(DEVICE)
-    loss_fn =  nn.BCELoss()
+    loss_fn =  nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     scheduler = setup_scheduler(optimizer)
+
+    # Define sample sizes for each iteration
+    sample_sizes = [300, 335, 370, 405, 440, 475, 510, 545, 580]
+
+    # GMM Cluster information
+    ranked_clusters_file="results/gmm_results/2025-04-22_03-38-29/ranked_cluster_assignments.csv"
+    prev_selected_file="results/gmm_results/2025-04-22_03-38-29/ranked_cluster_assignments_prev_selected.csv"
     
-    # Data loading
-    train_loader, val_loader, test_loader = load_and_review_data(
-        train_transform, val_transforms, test_transforms, config
-    )
+    # # Data loading
+    # train_loader, val_loader, test_loader = load_and_review_data(
+    #     train_transform, val_transforms, test_transforms, config,
+    #     ranked_clusters_file="results/gmm_results/2025-04-22_03-38-29/ranked_cluster_assignments.csv",
+    #     prev_selected_cluster_file="results/gmm_results/2025-04-22_03-38-29/ranked_cluster_assignments_prev_selected.csv"
+    # )
     
     # Model loading if needed
     start_epoch = load_pretrained_model(model, optimizer, scheduler)
+
+    # Iterative training
+    for i, sample_size in enumerate(sample_sizes):
+        iteration_num = i + 1
+        print(f"\n===== ITERATION {iteration_num}: Training with {sample_size} samples =====\n")\
     
+    # Data loading for current iteration
+        train_loader, val_loader, test_loader = load_and_review_data(
+            train_transform, val_transforms, test_transforms, config,
+            ranked_clusters_file=ranked_clusters_file,
+            prev_selected_cluster_file=prev_selected_file,
+            top_n_samples=sample_size
+        )
+
     # Training loop
     train_model(
         model, train_loader, val_loader, optimizer, 
@@ -227,9 +245,9 @@ def setup_scheduler(optimizer):
 
 
 """ Load and Review Data """
-def load_and_review_data(train_transform, val_transforms, test_transforms, config):
+def load_and_review_data(train_transform, val_transforms, test_transforms, config, ranked_clusters_file, prev_selected_cluster_file, top_n_samples):
     """Load and review training and validation data"""
-    train_loader, val_loader, test_loader = data_loader_for_fully_supervised_learning(
+    train_loader, val_loader, test_loader, updated_clusters_file, selected_clusters_file = data_loader_for_self_supervised_assisted_active_learning(
         TRAIN_IMG_DIR,
         TRAIN_MASK_DIR,
         VAL_IMG_DIR,
@@ -238,18 +256,37 @@ def load_and_review_data(train_transform, val_transforms, test_transforms, confi
         TEST_MASK_DIR,
         BATCH_SIZE,
         train_transform,
-        val_transforms, # no augmentation. only resizing
-        test_transforms, # no augmentation. only resizing
+        val_transforms, # no augmentation
+        test_transforms, # no augmentation
         num_workers=NUM_WORKERS,
         pin_memory=PIN_MEMORY,
         config=config,
-        shuffle_train=True # shuffle training dataset
+        shuffle_train=True, # shuffle training dataset
+        ranked_clusters_file=ranked_clusters_file, 
+        prev_selected_cluster_file=prev_selected_cluster_file,
+        top_n_samples=600  # Select top 300 samples
     )
-    print("train_loader and val_loarder is completed. \n")
+    
+    # ranked_clusters_file="results/gmm_results/2025-04-22_03-38-29/ranked_cluster_assignments.csv",
+    # prev_selected_cluster_file="results/gmm_results/2025-04-22_03-38-29/ranked_cluster_assignments_prev_selected.csv",
+    
+    df = pd.read_csv(updated_clusters_file)
+    updated_cluster_path = os.path.join("results/gmm_results/2025-04-22_03-38-29", "ranked_cluster_assignments_updated.csv")
+    df.to_csv(ranked_clusters_file, index=False)
+    print(f"Saved updated clusters to {ranked_clusters_file}")
+
+  
+    df = pd.read_csv(selected_clusters_file)
+    selected_clusters_path = os.path.join("results/gmm_results/2025-04-22_03-38-29", "ranked_cluster_assignments_selected.csv")
+    df.to_csv(prev_selected_cluster_file, index=False)
+    print(f"Saved selected clusters to {prev_selected_cluster_file}")
+
+    print(f"Data loading complete with {top_n_samples} samples for train_loader. \n")
+    print("train_loader, val_loarder, and test_loader is completed. \n")
     
     # Pixel value range
     inspect_pixel_value_range(train_loader, "Train Loader")
-    inspect_pixel_value_range(val_loader, "Validation Loader")
+    inspect_pixel_value_range(val_loader, "Val Loader")
     inspect_pixel_value_range(test_loader, "Test Loader")
     
     # Review training and validation data
@@ -259,9 +296,6 @@ def load_and_review_data(train_transform, val_transforms, test_transforms, confi
     print("\nReviewing validation data")
     check_dataloader_sizes(val_loader)
     review_batch(val_loader, 'validation data')
-    print("\nReviewing test data")
-    check_dataloader_sizes(test_loader)
-    review_batch(test_loader, 'test data')
     
     return train_loader, val_loader, test_loader
 
@@ -313,7 +347,7 @@ def train_model(model, train_loader, val_loader, optimizer, scheduler, loss_fn, 
             handle_improved_model(model, optimizer, scheduler, epoch, valid_loss, best_loss, model_path)
 
             # Save sample predictions
-            save_fss_predictions_images(val_loader, model, folder=image_path, device=DEVICE)
+            save_ssl_predictions_as_imgs(val_loader, model, folder=image_path, device=DEVICE)
 
             best_loss = valid_loss
             num_epoch_no_improvement = 0
@@ -345,7 +379,7 @@ def handle_improved_model(model, optimizer, scheduler, epoch, valid_loss, best_l
         'optimizer_state_dict': optimizer.state_dict(),
         'scheduler_state_dict': scheduler.state_dict()
     }
-    save_path = os.path.join(model_path, "fully_supervised_learning.pt")
+    save_path = os.path.join(model_path, "self_supervised_learning.pt")
     torch.save(save_dict, save_path)
     print(f"Saving model {save_path}")
     

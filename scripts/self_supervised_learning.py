@@ -20,7 +20,7 @@ from utils.utils import (
     get_loaders_with_augmentation,
     Config,
     inspect_pixel_value_range,
-    save_predictions_as_imgs,
+    save_ssl_predictions_as_imgs,
     load_trained_model,
     calculate_dice_score,
     print_current_lr,
@@ -206,8 +206,9 @@ def setup_scheduler(optimizer):
     scheduler = ReduceLROnPlateau(
         optimizer, 
         mode='min', 
-        factor=0.1, 
-        patience=10
+        factor=0.5, 
+        patience=5,
+        verbose=True  # Print when learning rate changes
     )
     print_current_lr(scheduler)
     return scheduler
@@ -291,7 +292,7 @@ def train_model(model, train_loader, val_loader, optimizer, scheduler, loss_fn, 
             handle_improved_model(model, optimizer, scheduler, epoch, valid_loss, best_loss, model_path)
 
             # Save sample predictions
-            save_predictions_as_imgs(val_loader, model, folder=image_path, device=DEVICE)
+            save_ssl_predictions_as_imgs(val_loader, model, folder=image_path, device=DEVICE)
 
             best_loss = valid_loss
             num_epoch_no_improvement = 0

@@ -20,7 +20,7 @@ from utils.utils import (
     get_loaders_with_augmentation,
     Config,
     inspect_pixel_value_range,
-    save_predictions_as_imgs,
+    save_ssl_predictions_as_imgs,
     load_trained_model,
     calculate_dice_score,
     print_current_lr,
