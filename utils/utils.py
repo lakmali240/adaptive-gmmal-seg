@@ -1179,7 +1179,7 @@ def data_loader_for_self_supervised_assisted_active_learning(
             # Save selected samples to a new file
             timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
             # newly_selected_clusters_file = ranked_clusters_file.replace('.csv', f'_newly_selected_{timestamp}.csv')
-            newly_selected_clusters_file = f'results/gmm_results/2025-04-22_03-38-29/ranked_cluster_assignments_newly_selected_{timestamp}.csv'
+            newly_selected_clusters_file = f'results/gmm_results/dynamic_features/ranked_cluster_assignments_newly_selected_{timestamp}.csv'
             selected_df.to_csv(newly_selected_clusters_file, index=False)
             print(f"Newly selected clusters information saved to {newly_selected_clusters_file}")
             
@@ -1188,13 +1188,13 @@ def data_loader_for_self_supervised_assisted_active_learning(
             
             # Save updated clusters file to a new path
             # updated_ranked_clusters_file = ranked_clusters_file.replace('.csv', f'_updated_{timestamp}.csv')
-            updated_ranked_clusters_file = f'results/gmm_results/2025-04-22_03-38-29/ranked_cluster_assignments_updated_{timestamp}.csv'
+            updated_ranked_clusters_file = f'results/gmm_results/dynamic_features/ranked_cluster_assignments_updated_{timestamp}.csv'
             updated_clusters_df.to_csv(updated_ranked_clusters_file, index=False)
             print(f"Updated ranked clusters file saved to {updated_ranked_clusters_file}")
 
             # Save all selected samples to a new path
             # all_selected_clusters_file = ranked_clusters_file.replace('.csv', f'_all_selected_{timestamp}.csv')
-            all_selected_clusters_file = f'results/gmm_results/2025-04-22_03-38-29/ranked_cluster_assignments_all_selected_{timestamp}.csv'
+            all_selected_clusters_file = f'results/gmm_results/dynamic_features/ranked_cluster_assignments_all_selected_{timestamp}.csv'
             all_selected_df = pd.DataFrame({'filename': all_selected_filenames})
             all_selected_df.to_csv(all_selected_clusters_file, index=False)
             print(f"All selected clusters information saved to {all_selected_clusters_file}")
@@ -1699,6 +1699,127 @@ def save_ssaal_predictions_images(
             torchvision.utils.save_image(
                 combined_with_labels, f"{folder}/batch{idx}_img{b}_combined.png"
             )         
+                     
+            # Convert tensor to PIL Image
+            pil_img = Image_PIL.open(f"{folder}/batch{idx}_img{b}_combined.png")
+            draw = ImageDraw_PIL.Draw(pil_img)
+            
+            # Add text labels (using default font)
+            font = None  # Use default font
+            
+            # Label positions (center of each image section)
+            label_positions = [
+                (w//2, label_height//2),                  # Input
+                (w + w//2, label_height//2),              # Prediction
+                (2*w + w//2, label_height//2)             # Target
+            ]
+            
+            # Labels
+            labels = ["Input", "Prediction", "Target"]
+            
+            # Add text
+            for pos, label in zip(label_positions, labels):
+                draw.text(pos, label, fill="white", font=font, anchor="mm")
+            
+            # Save the image with labels
+            pil_img.save(f"{folder}/batch{idx}_img{b}_combined.png")
+        
+        # Only save a few batches to avoid filling disk
+        # if idx >= 2:
+        #     break
+    
+    model.train()
+
+def save_ssaal_test_images(
+    loader, model, folder="saved_images/", device="cuda", iteration=None
+):
+    """
+    Save the input images, predictions, and targets as a single combined image with labels.
+    If iteration is provided, also save the three images separately with iteration in the filename.
+    
+    Args:
+        loader: DataLoader containing the images to make predictions on
+        model: The UNET model that returns both segmentation and bottleneck features
+        folder: Folder to save the images to
+        device: Device to use for predictions
+        iteration: Optional iteration number to include in the filenames of separate images
+    """
+    # Create the folder if it doesn't exist
+    os.makedirs(folder, exist_ok=True)
+    
+    model.eval()
+    for idx, (x, y) in enumerate(loader):        
+        x = x.to(device=device) # [-1, 1]
+        y = y.to(device=device) # {0,1}
+
+        with torch.no_grad():
+            # Handle the dual output of UNET model
+            preds, _ = model(x)
+            preds = torch.sigmoid(preds) # Convert logits to probabilities [0, 1]
+            preds = (preds > 0.5).float() # Convert to binary {0, 1} for metrics/visualization
+        
+        # Normalize this from [-1, 1] to [0, 1] for visualization
+        normalized_x = (x + 1) / 2       # [0,1]
+        
+        # Check channel dimensions
+        input_channels = normalized_x.size(1)
+        pred_channels = preds.size(1)
+        target_channels = y.size(1)                      
+    
+        # Combine input, prediction, and target horizontally
+        batch_size = x.size(0)
+        for b in range(batch_size):
+            # Get single images from batch
+            input_img = normalized_x[b:b+1]
+            pred_img = preds[b:b+1]
+            target_img = y[b:b+1]
+            
+            # Convert single-channel predictions and targets to 3-channel if needed
+            if pred_channels == 1 and input_channels == 3:
+                pred_img = pred_img.repeat(1, 3, 1, 1)
+            
+            if target_channels == 1 and input_channels == 3:
+                target_img = target_img.repeat(1, 3, 1, 1)
+            
+            # Get image dimensions
+            _, _, h, w = input_img.shape
+            
+            # Create label bands (20 pixels high black bars with white text)
+            label_height = 20
+            label_tensor = torch.zeros(1, 3, label_height, w * 3).to(device)
+            
+            # Create combined image with labels
+            combined_with_labels = torch.zeros(1, 3, h + label_height, w * 3).to(device)
+            
+            # Add images to the combined tensor
+            combined_with_labels[0, :, label_height:, 0:w] = input_img[0]
+            combined_with_labels[0, :, label_height:, w:2*w] = pred_img[0]
+            combined_with_labels[0, :, label_height:, 2*w:3*w] = target_img[0]
+            
+            # Add label bar at the top
+            combined_with_labels[0, :, 0:label_height, :] = label_tensor[0]
+            
+            # Save the combined image with labels
+            torchvision.utils.save_image(
+                combined_with_labels, f"{folder}/batch{idx}_img{b}_combined.png"
+            )         
+            
+            # If iteration is provided, save individual images with iteration in filename
+            if iteration is not None:
+                # Save input image
+                torchvision.utils.save_image(
+                    input_img, f"{folder}/batch{idx}_img{b}_input_{iteration}.png"
+                )
+                
+                # Save prediction image
+                torchvision.utils.save_image(
+                    pred_img, f"{folder}/batch{idx}_img{b}_prediction_{iteration}.png"
+                )
+                
+                # Save target image
+                torchvision.utils.save_image(
+                    target_img, f"{folder}/batch{idx}_img{b}_target_{iteration}.png"
+                )
                      
             # Convert tensor to PIL Image
             pil_img = Image_PIL.open(f"{folder}/batch{idx}_img{b}_combined.png")

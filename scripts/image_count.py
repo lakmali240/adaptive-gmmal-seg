@@ -124,7 +124,7 @@ def analyze_csv_files(file1_path, file2_path):
         print(f"Error analyzing CSV files: {e}")
 
 # Part 1: Count images in a single file
-file_path = 'results/ssaal_trained_model/2025-05-05_00-29-49/gmm_results/ranked_cluster_assignments_all_selected_20250505_013310.csv'
+file_path = 'results/ssaal_trained_model/2025-05-05_04-41-17/gmm_results/ranked_cluster_assignments_updated.csv'
 image_count = count_images_in_csv(file_path)
 print(f"\nTotal number of images in {file_path}: {image_count}")
 
@@ -132,6 +132,6 @@ print("\n----------------------------------------\n")
 
 # Part 2: Compare two files
 file1_path = file_path
-file2_path = 'results/ssaal_trained_model/2025-05-05_04-41-17/gmm_results/ranked_cluster_assignments_all_selected_20250505_053813.csv'
+file2_path = 'results/ssaal_trained_model/2025-05-05_04-41-17/gmm_results/ranked_cluster_assignments_updated_20250505_053813.csv'
 
 analyze_csv_files(file1_path, file2_path)
