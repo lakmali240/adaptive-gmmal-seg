@@ -63,12 +63,12 @@ PATH_TO_TRAINED_MODEL = ''
 IMAGE_RANKING_ASCENDING = False # True: Sort by rank in ascending order (high probablilty (low rank) values first); False: Sort by rank in desceding order (low probablilty (high rank) values first)
 
 """ Load Dataset"""
-TRAIN_IMG_DIR = "../ISIC_2017_dataset/data/train_images/"
-TRAIN_MASK_DIR = "../ISIC_2017_dataset/data/train_masks/" 
-VAL_IMG_DIR = "../ISIC_2017_dataset/data/val_images/"
-VAL_MASK_DIR = "../ISIC_2017_dataset/data/val_masks/" 
-TEST_IMG_DIR = "../ISIC_2017_dataset/data/test_images/"
-TEST_MASK_DIR = "../ISIC_2017_dataset/data/test_masks/" 
+TRAIN_IMG_DIR = " "
+TRAIN_MASK_DIR = " " 
+VAL_IMG_DIR = " "
+VAL_MASK_DIR = " " 
+TEST_IMG_DIR = " "
+TEST_MASK_DIR = " " 
 
 """ Saving Directory"""
 MODEL_DIRECTORY = "results/ssaal_trained_model"
