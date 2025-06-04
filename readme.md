@@ -3,7 +3,7 @@
 This repository implements the TAIAL (Task-Aligned Iterative Active Learning) framework described in the paper **"A Warmer Start to Active Learning with Adaptive Gaussian Mixture Models for Skin Lesion Segmentation"**.
 
 ## 🎯 Overview
-ABSTRACT: Active learning is a promising strategy for reducing anno-
+Active learning is a promising strategy for reducing anno-
 tation burdens in medical image segmentation, particularly
 for tasks like skin lesion segmentation, where expert annota-
 tions are costly and time-intensive. However, existing meth-
