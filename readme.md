@@ -370,12 +370,14 @@ results/
 ### Active Learning Methods
 
 1. **CBS (Cluster-Based Probability Selection):**
-   - Selects samples based on cluster membership probabilities
-   - Good for maintaining cluster diversity
+   - Samples are assigned to clusters based on the highest probability with the updated λ using Objective Function-Based GMM (OFB-GMM) (Equation 1 in paper)
+   - During sample selection, data points near decision boundaries—characterized by lower probability assignments—are prioritized for labeling
+   - Targets regions of high uncertainty to improve model performance
 
 2. **EBR (Entropy-Based Ranking within Cluster):**
-   - Uses prediction entropy for uncertainty estimation
-   - Better for identifying truly uncertain samples
+   - Following cluster assignment, samples within each cluster are ranked by their prediction entropy
+   - The entropy H_n for the n-th predicted image (mask) is computed (Equation 3 in paper)
+   - Samples exhibiting the highest entropy values within each cluster are prioritized for labeling
 
 ### Sample Selection Order
 
