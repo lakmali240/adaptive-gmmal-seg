@@ -16,7 +16,6 @@ def extract_features(
     feature_space_directory,
     train_img_dir,
     valid_img_dir, 
-    iter,
     image_height=256,
     image_width=256,
     batch_size=16,
@@ -184,17 +183,12 @@ if __name__ == "__main__":
     FEATURE_SPACE_DIRECTORY = "results/ssl_features_space"
     
     """ Iteration """
-    iteration_num=1
     # Updated to capture the third return value
     feature_file_path, file_names_path, txt_file_path = extract_features(
         path_to_trained_model=PATH_TO_TRAINED_MODEL,
         feature_space_directory=FEATURE_SPACE_DIRECTORY,
         train_img_dir=TRAIN_IMG_DIR,
         valid_img_dir=VAL_IMG_DIR,
-        iter=iteration_num  # Pass iteration_num explicitly
     )
     
     print(f"Feature extraction completed.")
-    print(f"Features saved to: {feature_file_path}")
-    print(f"CSV file names saved to: {file_names_path}")
-    print(f"TXT file names saved to: {txt_file_path}")

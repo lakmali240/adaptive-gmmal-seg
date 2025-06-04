@@ -24,11 +24,9 @@ from sklearn.mixture import GaussianMixture
 
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
-
-
 # ---------------------- RMNClustering and Trainer ----------------------
 class RMNClustering_adaptive_gmm(nn.Module):
-    def __init__(self, input_dim, hidden_dims, latent_dim, n_components, alpha=1, gamma=0.01, neeta=0.1, min_size_weight=0.05, min_cluster_size=10, proximity_threshold=5.0, n_neighbors=None):
+    def __init__(self, input_dim, hidden_dims, latent_dim, n_components, weight_log_likelihood_loss=1, weight_sep_term=0.01, weight_entropy_loss=0.1, min_size_weight=0.05, min_cluster_size=10, proximity_threshold=5.0, n_neighbors=None, freeze_encoder=False):
         super().__init__()
         self.autoencoder = nn.Sequential(
             nn.Linear(input_dim, hidden_dims[0]), nn.ReLU(),
@@ -39,15 +37,16 @@ class RMNClustering_adaptive_gmm(nn.Module):
         self.rmn_log_var = nn.Parameter(torch.zeros(n_components, latent_dim))
         self.rmn_log_pi = nn.Parameter(torch.zeros(n_components))
 
-        self.alpha = alpha
-        self.gamma = gamma
-        self.neeta = neeta
+        self.weight_log_likelihood_loss = weight_log_likelihood_loss
+        self.weight_sep_term = weight_sep_term
+        self.weight_entropy_loss = weight_entropy_loss
         self.min_size_weight = min_size_weight
         self.min_cluster_size = min_cluster_size
         self.proximity_threshold = proximity_threshold
         self.n_neighbors = n_neighbors if n_neighbors is not None else n_components // 2
         self.n_components = n_components
         self.latent_dim = latent_dim
+        self.freeze_encoder = freeze_encoder
 
     def get_params(self):
         pi = torch.softmax(self.rmn_log_pi, dim=0)
@@ -100,7 +99,7 @@ class RMNClustering_adaptive_gmm(nn.Module):
         cluster_sizes = responsibilities.sum(dim=0)
         size_penalty = torch.sum(torch.relu(self.min_cluster_size - cluster_sizes))
 
-        loss = self.alpha * log_likelihood_loss + self.gamma * separation_term + self.neeta * entropy_loss + self.min_size_weight * size_penalty
+        loss = self.weight_log_likelihood_loss * log_likelihood_loss + self.weight_sep_term * separation_term + self.weight_entropy_loss * entropy_loss + self.min_size_weight * size_penalty
         return loss
 
     def initialize_with_em(self, dataloader):
@@ -552,10 +551,9 @@ def generate_cluster_assignments_adaptive_gmm(model, dataloader, file_names, out
     with open(summary_path, 'w') as f:
         f.write(f"RMN Clustering with {model.n_components} components\n")
         f.write(f"Latent dimension: {model.latent_dim}\n")
-        f.write(f"Alpha (likelihood weight): {model.alpha}\n")
-        f.write(f"Gamma (separation weight): {model.gamma}\n")
-        f.write(f"Neeta (entropy weight): {model.neeta}\n\n")
-        
+        f.write(f"Alpha (likelihood weight): {model.weight_sep_term}\n")
+        f.write(f"Gamma (separation weight): {model.weight_entropy_loss}\n")
+        f.write(f"Neeta (entropy weight): {model.min_size_weight}\n\n")
         f.write("Mixture Weights:\n")
         pi_np = pi.detach().cpu().numpy()
         for i, weight in enumerate(pi_np):
@@ -570,16 +568,19 @@ def generate_cluster_assignments_adaptive_gmm(model, dataloader, file_names, out
     
     return ranked_df_path, output_path
 
-
 def train_model_adaptive_gmm(model, dataloader, file_names, n_epochs_adpt_gmm=10, lr=1e-3):
-    """
-    Modified training function that generates cluster assignments after training
-    """
     model.train()
     model.initialize_with_em(dataloader)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    visualize_clusters_adaptive_gmm(model, dataloader, epoch=0)  # Initial state
-    
+
+    # Freeze encoder weights if specified
+    if model.freeze_encoder:
+        print("[INFO] Freezing encoder weights...")
+        for param in model.autoencoder.parameters():
+            param.requires_grad = False
+
+    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=lr)
+    visualize_clusters_adaptive_gmm(model, dataloader, epoch=0)
+
     for epoch in range(n_epochs_adpt_gmm):
         total_loss = 0
         for batch in dataloader:
@@ -591,14 +592,10 @@ def train_model_adaptive_gmm(model, dataloader, file_names, n_epochs_adpt_gmm=10
             total_loss += loss.item()
         print(f"Epoch {epoch+1}: Total Loss = {total_loss / len(dataloader):.4f}")
         visualize_clusters_adaptive_gmm(model, dataloader, epoch=epoch+1)
-    
+
     create_gif_adaptive_gmm()
-    
-    # Generate cluster assignments after training
-    # print("\nGenerating cluster assignments...")
+
     ranked_csv_path, output_dir = generate_cluster_assignments_adaptive_gmm(model, dataloader, file_names)
-    # print(f"Cluster assignments available at: {ranked_csv_path}")
-    
     return ranked_csv_path, output_dir
 
 
@@ -607,9 +604,9 @@ def run_rmn_clustering_pipeline(
     hidden_dims=[100, 50],
     latent_dim=20,
     n_components=10,
-    alpha=1,
-    gamma=1,
-    neeta=0.3,
+    weight_log_likelihood_loss=1,
+    weight_sep_term=1,
+    weight_entropy_loss=0.3,
     min_size_weight=0.3,
     min_cluster_size=10,
     proximity_threshold=5,
@@ -621,7 +618,8 @@ def run_rmn_clustering_pipeline(
     val_img_dir=None,
     iteration_num_adpt_gmm=1,
     n_epochs_adpt_gmm=10,
-    lr_adpt_gmm=1e-3
+    lr_adpt_gmm=1e-3,
+    freeze_encoder=False
 ):
     """
     Run the complete RMN clustering pipeline with specified parameters.
@@ -631,9 +629,9 @@ def run_rmn_clustering_pipeline(
         hidden_dims (list): Hidden layer dimensions for the autoencoder
         latent_dim (int): Latent dimension for the autoencoder
         n_components (int): Number of mixture components
-        alpha (float): Weight for log-likelihood loss
-        gamma (float): Weight for separation term
-        neeta (float): Weight for entropy loss
+        weight_log_likelihood_loss (float): Weight for log-likelihood loss
+        weight_sep_term (float): Weight for separation term
+        weight_entropy_loss (float): Weight for entropy loss
         min_size_weight (float): Weight for minimum size penalty
         min_cluster_size (int): Minimum cluster size
         proximity_threshold (float): Threshold for proximity-based separation
@@ -654,14 +652,14 @@ def run_rmn_clustering_pipeline(
     print("Starting RMN Clustering Pipeline...")
     print(f"Parameters:")
     print(f"  - Model: input_dim={input_dim}, hidden_dims={hidden_dims}, latent_dim={latent_dim}")
-    print(f"  - Clustering: n_components={n_components}, alpha={alpha}, gamma={gamma}, neeta={neeta}")
+    print(f"  - Clustering: n_components={n_components}, weight_log_likelihood_loss={weight_log_likelihood_loss}, weight_sep_term={weight_sep_term}, weight_entropy_loss={weight_entropy_loss}")
     print(f"  - Constraints: min_size_weight={min_size_weight}, min_cluster_size={min_cluster_size}")
     print(f"  - Proximity: proximity_threshold={proximity_threshold}, n_neighbors={n_neighbors}")
     print(f"  - PCA: pca_components={pca_components}")
     print(f"  - Training: n_epochs={n_epochs_adpt_gmm}, lr={lr_adpt_gmm}")
     
     # Step 1: Extract Features
-    print("\n=== Step 1: Feature Extraction ===")
+    # print("\n=== Step 1: Feature Extraction ===")
     features_adpt_gmm, file_names_adpt_gmm = extract_features_adaptive_gmm(
         path_to_trained_model=PATH_TO_TRAINED_MODEL,
         feature_space_directory=FEATURE_SPACE_DIRECTORY,
@@ -671,30 +669,31 @@ def run_rmn_clustering_pipeline(
     )
 
     # Step 2: Apply PCA
-    print("\n=== Step 2: PCA Dimensionality Reduction ===")
+    # print("\n=== Step 2: PCA Dimensionality Reduction ===")
     reduced_features_adpt_gmm, pca_model_adpt_gmm = apply_pca_if_needed_adaptive_gmm(features_adpt_gmm, pca_components=pca_components)
 
     # Step 3: Prepare DataLoader
-    print("\n=== Step 3: Preparing DataLoader ===")
+    # print("\n=== Step 3: Preparing DataLoader ===")
     reduced_tensor_adpt_gmm = torch.tensor(reduced_features_adpt_gmm, dtype=torch.float32)
-    print("Reduced tensor shape:", reduced_tensor_adpt_gmm.shape)
+    # print("Reduced tensor shape:", reduced_tensor_adpt_gmm.shape)
     clustering_dataset_adpt_gmm = TensorDataset(reduced_tensor_adpt_gmm)
     clustering_loader_adpt_gmm = DataLoader(clustering_dataset_adpt_gmm, batch_size=128, shuffle=False)  # Don't shuffle to maintain order
 
     # Step 4: Initialize and Train RMN Clustering Model
-    print("\n=== Step 4: RMN Clustering Training ===")
+    # print("\n=== Step 4: RMN Clustering Training ===")
     model_adpt_gmm = RMNClustering_adaptive_gmm(
         input_dim=input_dim,
         hidden_dims=hidden_dims,
         latent_dim=latent_dim,
         n_components=n_components,
-        alpha=alpha,
-        gamma=gamma,
-        neeta=neeta,
+        weight_log_likelihood_loss=weight_log_likelihood_loss,
+        weight_sep_term=weight_sep_term,
+        weight_entropy_loss=weight_entropy_loss,
         min_size_weight=min_size_weight,
         min_cluster_size=min_cluster_size,
         proximity_threshold=proximity_threshold,
-        n_neighbors=n_neighbors
+        n_neighbors=n_neighbors,
+        freeze_encoder=freeze_encoder
     ).cuda()
 
     # Train model and generate cluster assignments
@@ -718,9 +717,9 @@ if __name__ == "__main__":
         hidden_dims=[100, 50],
         latent_dim=20,
         n_components=10,
-        alpha=1,
-        gamma=1,
-        neeta=0.3,
+        weight_log_likelihood_loss=1,
+        weight_sep_term=1,
+        weight_entropy_loss=0.3,
         min_size_weight=0.3,
         min_cluster_size=10,
         proximity_threshold=5,
@@ -728,9 +727,12 @@ if __name__ == "__main__":
         pca_components=20,
         PATH_TO_TRAINED_MODEL='results/ssl_trained_model/2025-04-19_01-19-21/self_supervised_learning.pt',
         FEATURE_SPACE_DIRECTORY="results/ssl_features_space",
-        train_imge_dir="../ISIC_2017_dataset/data/train_images/",
+        train_img_dir="../ISIC_2017_dataset/data/train_images/",
         val_img_dir="../ISIC_2017_dataset/data/val_images/",
         iteration_num_adpt_gmm=1,
         n_epochs_adpt_gmm=10,
-        lr_adpt_gmm=1e-3
+        lr_adpt_gmm=1e-3,
+        freeze_encoder=False        
     )
+    print("ranked_csv_path_adpt_gmm: ", ranked_csv_path_adpt_gmm)
+    print("output_dir_adpt_gmm: ", output_dir_adpt_gmm)

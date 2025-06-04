@@ -168,7 +168,7 @@ def get_loaders_with_augmentation(
             if len(self.images) == 0:
                 raise ValueError(f"No images found in {image_dir}")
                     
-            print(f"Found {len(self.images)} training images in {image_dir}")
+            # print(f"Found {len(self.images)} training images in {image_dir}")
 
         def __len__(self):
             return len(self.images)
@@ -248,7 +248,7 @@ def get_loaders_with_augmentation(
             if len(self.images) == 0:
                 raise ValueError(f"No images found in {image_dir}")
                     
-            print(f"Found {len(self.images)} validation images in {image_dir}")               
+            # print(f"Found {len(self.images)} validation images in {image_dir}")               
 
         def __len__(self):
             return len(self.images)
@@ -515,7 +515,7 @@ def data_loader_for_fully_supervised_learning(
             if len(self.images) == 0:
                 raise ValueError(f"No valid image-mask pairs found in {image_dir} and {mask_dir}")
                     
-            print(f"Found {len(self.images)} training image-mask pairs")
+            # print(f"Found {len(self.images)} training image-mask pairs")
 
         def __len__(self):
             return len(self.images)
@@ -613,7 +613,7 @@ def data_loader_for_fully_supervised_learning(
             if len(self.images) == 0:
                 raise ValueError(f"No valid image-mask pairs found in {image_dir} and {mask_dir}")
                     
-            print(f"Found {len(self.images)} validation image-mask pairs")
+            # print(f"Found {len(self.images)} validation image-mask pairs")
 
         def __len__(self):
             return len(self.images)
@@ -690,7 +690,7 @@ def data_loader_for_fully_supervised_learning(
             if len(self.images) == 0:
                 raise ValueError(f"No valid image-mask pairs found in {image_dir} and {mask_dir}")
                     
-            print(f"Found {len(self.images)} test image-mask pairs")
+            # print(f"Found {len(self.images)} test image-mask pairs")
 
         def __len__(self):
             return len(self.images)
@@ -971,7 +971,7 @@ def data_loader_for_self_supervised_assisted_active_learning(
                             self.clusters[filename] = int(row['cluster'])
                             self.ranks[filename] = int(row['rank'])
                             self.likelihoods[filename] = float(row['likelihood'])
-                    print(f"Loaded cluster assignments for {len(self.clusters)} images")
+                    # print(f"Loaded cluster assignments for {len(self.clusters)} images")
                 except Exception as e:
                     print(f"Error loading cluster assignments: {e}")
             
@@ -985,7 +985,7 @@ def data_loader_for_self_supervised_assisted_active_learning(
             if len(self.images) == 0:
                 raise ValueError(f"No valid image-mask pairs found in {image_dir} and {mask_dir}")
                     
-            print(f"Found {len(self.images)} training image-mask pairs")
+            # print(f"Found {len(self.images)} training image-mask pairs")
 
         def __len__(self):
             return len(self.images)
@@ -1076,12 +1076,12 @@ def data_loader_for_self_supervised_assisted_active_learning(
 
     # Step 2: Select additional new samples to reach top_n_samples total
     remaining_samples_needed = top_n_samples - len(previously_selected_filenames)
-    print(f"Need to select {remaining_samples_needed} additional samples to reach total of {top_n_samples}")
+    # print(f"Need to select {remaining_samples_needed} additional samples to reach total of {top_n_samples}")
     
     if remaining_samples_needed > 0 and ranked_clusters_file and os.path.exists(ranked_clusters_file):
         try:
             clusters_df = pd.read_csv(ranked_clusters_file)
-            print(f"Loaded {len(clusters_df)} entries from ranked clusters file")
+            # print(f"Loaded {len(clusters_df)} entries from ranked clusters file")
             
             # Filter to include only files that exist in training directory and are not previously selected
             train_files = set([img for img in os.listdir(train_img_dir) 
@@ -1135,7 +1135,7 @@ def data_loader_for_self_supervised_assisted_active_learning(
                         cluster_samples = clusters_df[clusters_df['cluster'] == cluster].sort_values('rank')
                     elif image_ranking_ascending is False:  
                         # Sort by rank in desceding order (low probablilty (high rank) values first)
-                        print("Sort by rank in desceding order (low probablilty (high rank) values first)")
+                        # print("Sort by rank in desceding order (low probablilty (high rank) values first)")
                         cluster_samples = clusters_df[clusters_df['cluster'] == cluster].sort_values('rank', ascending=False)
                     else:
                         # Handle unexpected value
@@ -1178,26 +1178,23 @@ def data_loader_for_self_supervised_assisted_active_learning(
             
             # Save selected samples to a new file
             timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
-            # newly_selected_clusters_file = ranked_clusters_file.replace('.csv', f'_newly_selected_{timestamp}.csv')
-            newly_selected_clusters_file = f'results/gmm_results/dynamic_features/ranked_cluster_assignments_newly_selected_{timestamp}.csv'
+            newly_selected_clusters_file = f'results/cluster_info/ranked_cluster_assignments_newly_selected_temp.csv'
             selected_df.to_csv(newly_selected_clusters_file, index=False)
-            print(f"Newly selected clusters information saved to {newly_selected_clusters_file}")
+            # print(f"Newly selected clusters information saved to {newly_selected_clusters_file}")
             
             # Create updated clusters file by removing all selected samples
             updated_clusters_df = all_clusters_df[~all_clusters_df['filename'].isin(all_selected_filenames)]
             
             # Save updated clusters file to a new path
-            # updated_ranked_clusters_file = ranked_clusters_file.replace('.csv', f'_updated_{timestamp}.csv')
-            updated_ranked_clusters_file = f'results/gmm_results/dynamic_features/ranked_cluster_assignments_updated_{timestamp}.csv'
+            updated_ranked_clusters_file = f'results/cluster_info/ranked_cluster_assignments_updated_temp.csv'
             updated_clusters_df.to_csv(updated_ranked_clusters_file, index=False)
-            print(f"Updated ranked clusters file saved to {updated_ranked_clusters_file}")
+            # print(f"Updated ranked clusters file saved to {updated_ranked_clusters_file}")
 
             # Save all selected samples to a new path
-            # all_selected_clusters_file = ranked_clusters_file.replace('.csv', f'_all_selected_{timestamp}.csv')
-            all_selected_clusters_file = f'results/gmm_results/dynamic_features/ranked_cluster_assignments_all_selected_{timestamp}.csv'
+            all_selected_clusters_file = f'results/cluster_info/ranked_cluster_assignments_previously_selected_temp.csv'
             all_selected_df = pd.DataFrame({'filename': all_selected_filenames})
             all_selected_df.to_csv(all_selected_clusters_file, index=False)
-            print(f"All selected clusters information saved to {all_selected_clusters_file}")
+            # print(f"All selected clusters information saved to {all_selected_clusters_file}")
             
             # Create a subset of indices to include in training
             train_files_list = sorted([img for img in os.listdir(train_img_dir) 
@@ -1268,7 +1265,7 @@ def data_loader_for_self_supervised_assisted_active_learning(
             if len(self.images) == 0:
                 raise ValueError(f"No valid image-mask pairs found in {image_dir} and {mask_dir}")
                     
-            print(f"Found {len(self.images)} validation image-mask pairs")
+            # print(f"Found {len(self.images)} validation image-mask pairs")
 
         def __len__(self):
             return len(self.images)
@@ -1345,7 +1342,7 @@ def data_loader_for_self_supervised_assisted_active_learning(
             if len(self.images) == 0:
                 raise ValueError(f"No valid image-mask pairs found in {image_dir} and {mask_dir}")
                     
-            print(f"Found {len(self.images)} test image-mask pairs")
+            # print(f"Found {len(self.images)} test image-mask pairs")
 
         def __len__(self):
             return len(self.images)
@@ -1386,7 +1383,7 @@ def data_loader_for_self_supervised_assisted_active_learning(
     # Create a subset of the training dataset with only the selected files if we have indices
     if train_indices is not None and len(train_indices) > 0:
         train_ds = Subset(train_ds, train_indices)
-        print(f"Using subset of {len(train_indices)} training samples instead of {len(os.listdir(train_img_dir))}")
+        # print(f"Using subset of {len(train_indices)} training samples instead of {len(os.listdir(train_img_dir))}")
 
     # Create data loaders
     train_loader = DataLoader(
@@ -2318,5 +2315,5 @@ def review_batch(loader, title, num_images=5, figsize=(25, 15)):
     fig.suptitle(title, fontsize=16)
     plt.subplots_adjust(top=0.9)
     plt.draw() 
-    plt.pause(5)
+    plt.pause(2)
     plt.close()

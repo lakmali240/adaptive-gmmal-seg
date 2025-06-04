@@ -120,7 +120,8 @@ if __name__ == "__main__":
     success = extract_and_save_filenames(input_csv, output_csv)
     
     if success:
-        print("Operation completed successfully.")
+        pass
+        # print("Operation completed successfully.")
     else:
         print("Operation failed.")
 
