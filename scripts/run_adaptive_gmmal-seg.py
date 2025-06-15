@@ -458,6 +458,33 @@ def main():
         if iteration_num == 1:
             current_ranked_clusters_file = BASE_RANKED_CLUSTERS_FILE
             prev_selected_current_file = None
+            if LOAD_TRAINED_SSL_MODEL:
+                # Dynamic features extraction - Adaptive GMM
+                print("--- DYNAMIC FEATURES EXTRACTION and Adaptive GMM ---")
+                ranked_df_path_adaptive_gmm, output_dir_adpt_gmm = run_rmn_clustering_pipeline(
+                    input_dim=ADAPTIVE_GMM_CONFIG['input_dim'],
+                    hidden_dims=ADAPTIVE_GMM_CONFIG['hidden_dims'],
+                    latent_dim=ADAPTIVE_GMM_CONFIG['latent_dim'],
+                    n_components=ADAPTIVE_GMM_CONFIG['n_components'],
+                    weight_log_likelihood_loss=ADAPTIVE_GMM_CONFIG['weight_log_likelihood_loss'],
+                    weight_sep_term=ADAPTIVE_GMM_CONFIG['weight_sep_term'],
+                    weight_entropy_loss=ADAPTIVE_GMM_CONFIG['weight_entropy_loss'],
+                    min_size_weight=ADAPTIVE_GMM_CONFIG['min_size_weight'],
+                    min_cluster_size=ADAPTIVE_GMM_CONFIG['min_cluster_size'],
+                    proximity_threshold=ADAPTIVE_GMM_CONFIG['proximity_threshold'],
+                    n_neighbors=ADAPTIVE_GMM_CONFIG['n_neighbors'],
+                    pca_components=ADAPTIVE_GMM_CONFIG['pca_components'],
+                    PATH_TO_TRAINED_MODEL=PREV_MODEL_PATH,
+                    FEATURE_SPACE_DIRECTORY=FEATURE_SPACE_DIRECTORY,
+                    train_img_dir=TRAIN_IMG_DIR,
+                    val_img_dir=VAL_IMG_DIR,
+                    iteration_num_adpt_gmm=iteration_num,
+                    n_epochs_adpt_gmm=ADAPTIVE_GMM_CONFIG['n_epochs_adpt_gmm'],
+                    lr_adpt_gmm=ADAPTIVE_GMM_CONFIG['lr_adpt_gmm'],
+                    freeze_encoder=ADAPTIVE_GMM_CONFIG['freeze_encoder']
+                )
+                current_ranked_clusters_file = ranked_df_path_adaptive_gmm 
+
         else:
             # Dynamic features extraction - Adaptive GMM
             print("--- DYNAMIC FEATURES EXTRACTION and Adaptive GMM ---")
@@ -486,9 +513,9 @@ def main():
             
             print("--- EXTRACT COMMON RECORDS ---")
             matches = extract_matching_records(
-                ranked_df_path_adaptive_gmm,
-                "results/cluster_info/ranked_cluster_assignments_updated_filenames.csv",
-                UPDATED_RANKED_CLUSTERS_FILE
+                ranked_df_path_adaptive_gmm, # All images with Adaptive GMM results
+                "results/cluster_info/ranked_cluster_assignments_updated_filenames.csv", # Not selected images yet
+                UPDATED_RANKED_CLUSTERS_FILE # Path to output CSV file (common file names and other details)
             )
             print(f"Found {matches} matching records.")
 
