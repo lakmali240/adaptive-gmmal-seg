@@ -464,12 +464,17 @@ results/
 If you use this code in your research, please cite:
 
 ```bibtex
-@article{XXX,
-  title={A Warmer Start to Active Learning with Adaptive Gaussian Mixture Models for Skin Lesion Segmentation},
-  author={XXX},
-  journal={XXX},
-  year={XXX}
-}
+@INPROCEEDINGS{11084666,
+  author={Kumari, Lakmali Nadeesha and Bandara, Chanaka Thushitha and Chuah, Chen-Nee and Cheung, Sen-Ching Samson},
+  booktitle={2025 IEEE International Conference on Image Processing (ICIP)}, 
+  title={A Warmer Start to Active Learning with Adaptive Gaussian Mixture Models for Skin Lesion Segmentation}, 
+  year={2025},
+  volume={},
+  number={},
+  pages={2247-2252},
+  keywords={Image segmentation;Uncertainty;Annotations;Scalability;Active learning;Skin;Robustness;Lesions;Gaussian mixture model;Biomedical imaging;Skin Lesion Segmentation;Active Learning;Gaussian Mixture Model;Feature Space Clustering;Annotation Efficiency},
+  doi={10.1109/ICIP55913.2025.11084666}}
+
 ```
 
 ## 📞 Support
