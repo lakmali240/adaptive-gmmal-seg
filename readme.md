@@ -461,7 +461,7 @@ results/
 
 ## 📝 Citation
 
-If you use this code in your research, please cite:
+If you use this code or find our work helpful, please cite:
 
 ```bibtex
 @INPROCEEDINGS{11084666,
